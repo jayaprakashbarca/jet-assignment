@@ -15,6 +15,10 @@ spec:
     - namespace: articles
       server: https://kubernetes.default.svc
 
+  clusterResourceWhitelist:
+    - group: storage.k8s.io
+      kind: StorageClass
+
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
