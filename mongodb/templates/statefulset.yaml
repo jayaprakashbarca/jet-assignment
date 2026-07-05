@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  serviceName: {{ .Values.service.name }}
+
+  replicas: {{ .Values.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: mongodb
+
+  template:
+    metadata:
+      labels:
+        app: mongodb
+
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: mongodb
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: mongodb
+
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          command:
+            - mongod
+            - "--replSet"
+            - {{ .Values.replicaSetName | quote }}
+            - "--bind_ip_all"
+
+          ports:
+            - name: mongodb
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - "--quiet"
+                - "--eval"
+                - "db.adminCommand('ping').ok"
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - "--quiet"
+                - "--eval"
+                - "db.adminCommand('ping').ok"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+
+      spec:
+        accessModes:
+          - ReadWriteOnce
+
+        {{- if .Values.storage.storageClassName }}
+        storageClassName: {{ .Values.storage.storageClassName | quote }}
+        {{- end }}
+
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}

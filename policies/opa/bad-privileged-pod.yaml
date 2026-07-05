@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-test
+  namespace: articles
+spec:
+  containers:
+    - name: privileged-container
+      image: nginx:latest
+
+      securityContext:
+        privileged: true

@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: backend-network-policy
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  podSelector:
+    matchLabels:
+      app: articles-backend
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow inbound traffic to backend application port
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+
+  egress:
+    # Allow backend to MongoDB pods
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb
+
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # Allow DNS to CoreDNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+
+      ports:
+        - protocol: UDP
+          port: 53
+
+        - protocol: TCP
+          port: 53

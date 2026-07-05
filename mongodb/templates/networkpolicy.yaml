@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: mongodb-network-policy
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow MongoDB replica-set members
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mongodb
+
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+
+    # Allow replica-set initialization Job
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mongodb-init
+
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+
+    # Allow backend application
+    - from:
+        - podSelector:
+            matchLabels:
+              app: articles-backend
+
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}

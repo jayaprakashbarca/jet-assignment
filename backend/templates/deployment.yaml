@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: articles-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: articles-backend
+
+spec:
+  replicas: {{ .Values.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: articles-backend
+
+  template:
+    metadata:
+      labels:
+        app: articles-backend
+
+    spec:
+
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: articles-backend
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: articles-backend
+
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+
+          env:
+            - name: MONGO_URI
+              value: {{ .Values.env.MONGO_URI | quote }}
+
+            - name: DB_NAME
+              value: {{ .Values.env.DB_NAME | quote }}
+
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+
+            - name: TMPDIR
+              value: /tmp
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,39 @@
+replicaCount: 3
+
+image:
+  repository: 475176878365.dkr.ecr.us-east-1.amazonaws.com/jay-api
+  tag: "1.1"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: articles-backend-sa
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::475176878365:role/jay-assignment-backend-irsa-role
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 5000
+
+env:
+  DB_NAME: article_db
+  MONGO_URI: mongodb://mongodb-0.mongodb-headless:27017,mongodb-1.mongodb-headless:27017,mongodb-2.mongodb-headless:27017/article_db?replicaSet=rs0
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 2

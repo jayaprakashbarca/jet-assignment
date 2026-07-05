@@ -1,0 +1,102 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: mongodb-init-replica
+  namespace: {{ .Release.Namespace }}
+
+  labels:
+    app: mongodb-init
+
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+
+spec:
+  backoffLimit: 6
+
+  template:
+    metadata:
+      labels:
+        app: mongodb-init
+
+    spec:
+      restartPolicy: OnFailure
+
+      containers:
+        - name: init-replica
+
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MongoDB replica members..."
+
+              until mongosh \
+                --host mongodb-0.{{ .Values.service.name }}:{{ .Values.service.port }} \
+                --quiet \
+                --eval "db.adminCommand('ping').ok"; do
+
+                echo "Waiting for mongodb-0..."
+                sleep 5
+              done
+
+              until mongosh \
+                --host mongodb-1.{{ .Values.service.name }}:{{ .Values.service.port }} \
+                --quiet \
+                --eval "db.adminCommand('ping').ok"; do
+
+                echo "Waiting for mongodb-1..."
+                sleep 5
+              done
+
+              until mongosh \
+                --host mongodb-2.{{ .Values.service.name }}:{{ .Values.service.port }} \
+                --quiet \
+                --eval "db.adminCommand('ping').ok"; do
+
+                echo "Waiting for mongodb-2..."
+                sleep 5
+              done
+
+              echo "All MongoDB members are reachable."
+
+              mongosh \
+                --host mongodb-0.{{ .Values.service.name }}:{{ .Values.service.port }} \
+                --eval '
+                  try {
+                    const status = rs.status();
+
+                    if (status.ok === 1) {
+                      print("Replica set already initialized");
+                      quit(0);
+                    }
+                  } catch (e) {
+                    print("Replica set not initialized. Initializing...");
+                  }
+
+                  rs.initiate({
+                    _id: "{{ .Values.replicaSetName }}",
+                    members: [
+                      {
+                        _id: 0,
+                        host: "mongodb-0.{{ .Values.service.name }}:{{ .Values.service.port }}"
+                      },
+                      {
+                        _id: 1,
+                        host: "mongodb-1.{{ .Values.service.name }}:{{ .Values.service.port }}"
+                      },
+                      {
+                        _id: 2,
+                        host: "mongodb-2.{{ .Values.service.name }}:{{ .Values.service.port }}"
+                      }
+                    ]
+                  });
+                '
+
+              echo "Replica set initialization command completed."
