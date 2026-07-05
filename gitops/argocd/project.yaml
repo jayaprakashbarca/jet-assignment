@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+
+metadata:
+  name: articles-project
+  namespace: argocd
+
+spec:
+  description: GitOps project for Articles Backend and MongoDB
+
+  sourceRepos:
+    - "https://github.com/jayaprakashbarca/jet-assignment.git"
+
+  destinations:
+    - namespace: articles
+      server: https://kubernetes.default.svc
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
